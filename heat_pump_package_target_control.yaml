@@ -1,7 +1,7 @@
 input_number:
   hp_target_temp:
     name: HP Target Temp
-    min: 25
+    min: 5
     max: 55
     step: 1
     unit_of_measurement: "°C"
@@ -25,12 +25,43 @@ automation:
     trigger:
       - platform: state
         entity_id: sensor.hp_current_target
+      - platform: homeassistant
+        event: start
+        id: boot
+    action:
+      - if:
+          - condition: trigger
+            id: boot
+        then:
+          - delay: "00:00:10"
+      - if:
+          - condition: template
+            value_template: >
+              {{ states('sensor.hp_current_target') not in ['unknown', 'unavailable']
+                 and states('sensor.hp_current_target') != states('input_number.hp_target_temp') | int | string }}
+        then:
+          - service: input_number.set_value
+            target:
+              entity_id: input_number.hp_target_temp
+            data:
+              value: "{{ states('sensor.hp_current_target') | int }}"
+
+  - alias: "HP Clamp Target Temp for Mode"
+    trigger:
+      - platform: state
+        entity_id: select.hp_mode
+      - platform: homeassistant
+        event: start
+    variables:
+      target_min: "{{ 5 if states('select.hp_mode') == 'Cooling' else 25 }}"
+      target_max: "{{ 25 if states('select.hp_mode') == 'Cooling' else 55 }}"
+      current: "{{ states('input_number.hp_target_temp') | float(0) }}"
     condition:
       - condition: template
-        value_template: "{{ trigger.to_state.state not in ['unknown', 'unavailable'] and trigger.to_state.state != states('input_number.hp_target_temp') | int | string }}"
+        value_template: "{{ current > target_max or current < target_min }}"
     action:
       - service: input_number.set_value
         target:
           entity_id: input_number.hp_target_temp
         data:
-          value: "{{ trigger.to_state.state | int }}"
+          value: "{{ target_max if current > target_max else target_min }}"

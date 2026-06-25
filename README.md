@@ -129,7 +129,7 @@ Config directory: `/root/homeassistant/config/`
 - Real-time monitoring: temperatures, pressures, compressor frequency, COP
 - Power on/off control via Modbus (register 0)
 - Mode control: Auto / Heating / Cooling (register 1)
-- Target temperature adjustment with +/- buttons
+- Target temperature adjustment with +/- buttons, auto-clamped to the active mode's valid range (Cooling 5-25°C, Heating 25-55°C)
 - Energy tracking (daily/monthly/yearly)
 - Historical graphs for temperatures, power, COP (10-day full resolution)
 - Long-term statistics (>10 days) for outdoor temp, water temps, compressor frequency, pressures, discharge temp, water flow
@@ -142,8 +142,12 @@ Config directory: `/root/homeassistant/config/`
 |--------:|:-----|:------------|
 |       0 | Power on/off | Bit field: Bit1=Zone1 water (0b0010=2 for Zone1-only), 0=off |
 |       1 | Mode setting | 1=Auto, 2=Cooling, 3=Heating |
-|       2 | Set water temp T1s | Zone1 target (low byte), Zone2 (high byte) |
+|       2 | Set water temp T1s | Zone1 target (low byte), Zone2 (high byte). Same register for both modes — only the valid range differs (see below) |
 |      16 | Power Zone 1 | Zone1 water temp subsystem switch (reg 0 is the real power control) |
+|     201 | T1s cooling upper limit | Max valid target in Cooling mode (e.g. 25°C) |
+|     202 | T1s cooling lower limit | Min valid target in Cooling mode (e.g. 5°C) |
+|     203 | T1s heating upper limit | Max valid target in Heating mode (e.g. 55°C) |
+|     204 | T1s heating lower limit | Min valid target in Heating mode (e.g. 25°C) |
 |     100 | Compressor frequency | Current frequency in Hz, 0=off |
 |     101 | Operating state | 0=off, 2=cooling active, 3=heating active |
 |     104 | Tw_in | Water inlet (return) temperature |
@@ -161,7 +165,7 @@ Config directory: `/root/homeassistant/config/`
 |     138 | Water flow | Flow rate through heat exchanger (x0.01 m³/h) |
 |     143 | Energy consumption high | Cumulative kWh, high 16 bits (x0.01) |
 |     144 | Energy consumption low | Cumulative kWh, low 16 bits (x0.01) |
-|     150 | Heating power | Real-time power consumption (x0.01 kW) |
+|     150 | Heating power | Real-time power consumption (x0.01 kW). On this unit, reads 0 continuously while in Cooling mode even with the compressor running — appears to be a firmware limitation specific to cooling. Works correctly in Heating mode |
 |     151 | Heating COP | Real-time coefficient of performance (x0.01) |
 |     199 | Operation mode | 0=Off, 2=Cool, 3=Heat, 5=DHW |
 

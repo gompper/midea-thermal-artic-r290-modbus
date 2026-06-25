@@ -19,6 +19,12 @@ lovelace:
       filename: heat_pump_dashboard.yaml
       title: Heat Pump
       icon: mdi:heat-pump-outline
+    solakon-solar:
+      mode: yaml
+      filename: solakon_dashboard.yaml
+      title: SaviourOne Solar
+      icon: mdi:solar-power-variant-outline
+
 
 template:
   - sensor:
@@ -58,6 +64,7 @@ template:
           {{ (states('sensor.hp_odu_current') | float(0) *
               states('sensor.hp_odu_voltage') | float(0)) | round(0) }}
       - name: "HP COP Filtered"
+        unique_id: hp_cop_filtered
         unit_of_measurement: ""
         state_class: measurement
         state: >
@@ -71,6 +78,17 @@ template:
         state: >
           {{ (states('sensor.hp_outlet_water_temp') | float(0) -
               states('sensor.hp_water_inlet_temp') | float(0)) | round(1) }}
+      - name: "HP Zone 1 Active"
+        state: >
+          {% set state = states('sensor.hp_operating_state') | int(0) %}
+          {% set freq = states('sensor.hp_compressor_frequency') | int(0) %}
+          {% if state == 3 and freq > 0 %}🔥 Active
+          {% elif state == 3 %}♨️ Standby
+          {% elif state == 2 and freq > 0 %}❄️ Active
+          {% elif state == 2 %}❄️ Standby
+          {% else %}⚫ Off
+          {% endif %}
+
       - name: "HP Energy Total"
         unique_id: hp_energy_total
         unit_of_measurement: "kWh"
@@ -88,20 +106,22 @@ template:
   - select:
       - name: "HP Mode"
         unique_id: hp_mode_select
+        icon: >
+          {% set mode = states('sensor.hp_mode_raw') | int(0) %}
+          {% if mode == 3 %}mdi:fire{% elif mode == 1 %}mdi:autorenew{% else %}mdi:snowflake{% endif %}
         options: "{{ ['Auto', 'Cooling', 'Heating'] }}"
         state: >
           {% set mode = states('sensor.hp_mode_raw') | int(0) %}
           {% if mode == 1 %}Auto
-          {% elif mode == 2 %}Cooling
-          {% else %}Heating{% endif %}
+          {% elif mode == 3 %}Heating
+          {% else %}Cooling{% endif %}
         select_option:
           - action: modbus.write_register
             data:
               hub: midea
               slave: 2
               address: 1
-              value: >
-                {% if option == 'Auto' %}1{% elif option == 'Cooling' %}2{% else %}3{% endif %}
+              value: "{{ 1 if option == 'Auto' else (3 if option == 'Heating' else 2) }}"
 
 utility_meter:
   hp_energy_daily:

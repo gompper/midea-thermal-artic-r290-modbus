@@ -5,42 +5,54 @@ views:
     cards:
       - type: vertical-stack
         cards:
+          # === Outdoor Temperature (7 days) ===
+          - type: custom:apexcharts-card
+            header:
+              show: true
+              title: Outdoor Temperature (7 days)
+            graph_span: 7d
+            apex_config:
+              chart:
+                height: 150
+            series:
+              - entity: sensor.hp_outdoor_temp
+                name: Outdoor (T4)
+                color: "#FFA500"
+                statistics:
+                  type: mean
+                  period: hour
+
           # === Power, Target, Mode, State, Error ===
           - type: horizontal-stack
             cards:
-              - type: entity
+              - type: tile
                 entity: switch.hp_power
                 name: Power
                 icon: mdi:power
+                tap_action:
+                  action: toggle
               - type: tile
                 entity: input_number.hp_target_temp
                 name: Target
                 features:
                   - type: numeric-input
                     style: buttons
-              - type: entity
+              - type: tile
                 entity: select.hp_mode
                 name: Mode
+                features:
+                  - type: select-options
               - type: entity
                 entity: sensor.hp_state_text
                 name: State
               - type: entity
+                entity: sensor.hp_zone_1_active
+                name: Zone 1
+                icon: mdi:radiator
+              - type: entity
                 entity: sensor.hp_error_code
                 name: Error
                 icon: mdi:alert-circle-outline
-
-          # === Outdoor Temperature (7 days) ===
-          - type: statistics-graph
-            title: Outdoor Temperature (7 days)
-            entities:
-              - entity: sensor.hp_outdoor_temp
-                name: Outdoor (T4)
-            stat_types:
-              - mean
-              - min
-              - max
-            period: hour
-            days_to_show: 7
 
           # === Current Water Temps ===
           - type: horizontal-stack
@@ -78,26 +90,6 @@ views:
               - entity: sensor.hp_outdoor_temp
                 name: Outdoor (T4)
 
-          # === Energy Summary ===
-          - type: horizontal-stack
-            cards:
-              - type: entity
-                entity: sensor.hp_energy_daily
-                name: Today
-                icon: mdi:counter
-              - type: entity
-                entity: sensor.hp_energy_monthly
-                name: Month
-                icon: mdi:calendar-month
-              - type: entity
-                entity: sensor.hp_energy_yearly
-                name: Year
-                icon: mdi:calendar
-              - type: entity
-                entity: sensor.hp_energy_total
-                name: Total
-                icon: mdi:sigma
-
           # === Electrical ===
           - type: horizontal-stack
             cards:
@@ -121,10 +113,24 @@ views:
           # === Compressor & Pressure ===
           - type: horizontal-stack
             cards:
-              - type: entity
-                entity: sensor.hp_compressor_frequency
-                name: Compressor
-                icon: mdi:sine-wave
+              - type: entities
+                entities:
+                  - entity: sensor.hp_cop_filtered
+                    name: COP
+                    icon: mdi:leaf
+                header:
+                  type: graph
+                  entity: sensor.hp_cop_filtered
+                  detail: 2
+              - type: entities
+                entities:
+                  - entity: sensor.hp_compressor_frequency
+                    name: Compressor
+                    icon: mdi:sine-wave
+                header:
+                  type: graph
+                  entity: sensor.hp_compressor_frequency
+                  detail: 2
               - type: gauge
                 entity: sensor.hp_high_pressure
                 name: High Pressure
@@ -150,11 +156,10 @@ views:
           - type: horizontal-stack
             cards:
               - type: statistics-graph
-                title: Power & Compressor
+                title: Power
                 entities:
                   - entity: sensor.hp_power_consumption
                   - entity: sensor.hp_odu_power
-                  - entity: sensor.hp_compressor_frequency
                 stat_types:
                   - mean
                 period: 5minute
@@ -171,14 +176,32 @@ views:
                     name: Suction (Th)
 
           # === COP History ===
-          - type: statistics-graph
+          - type: history-graph
             title: COP
+            hours_to_show: 24
             entities:
               - entity: sensor.hp_cop_filtered
-            stat_types:
-              - mean
-            period: 5minute
-            days_to_show: 1
+                name: COP
+
+          # === Energy Summary ===
+          - type: horizontal-stack
+            cards:
+              - type: entity
+                entity: sensor.hp_energy_daily
+                name: Today
+                icon: mdi:counter
+              - type: entity
+                entity: sensor.hp_energy_monthly
+                name: Month
+                icon: mdi:calendar-month
+              - type: entity
+                entity: sensor.hp_energy_yearly
+                name: Year
+                icon: mdi:calendar
+              - type: entity
+                entity: sensor.hp_energy_total
+                name: Total
+                icon: mdi:sigma
 
           # === Daily Energy ===
           - type: statistics-graph

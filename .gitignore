@@ -17,6 +17,7 @@ venv/
 
 # Secrets
 secrets.yaml
+secrets.md
 
 # OS
 .DS_Store

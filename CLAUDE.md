@@ -16,6 +16,8 @@ Heat Pump (RS-485 H1/H2) → EW11-A → WiFi (AP: leni) → Pi wlan0 → Pi eth0
 Pi runs wlan0 as an isolated AP ("leni", 10.10.100.x), EW11-A connects as STA client.
 Pi is on ethernet to FritzBox for Home Assistant traffic.
 
+
+
 ### EW11-A to Wired Controller Wiring
 - EW11-A A (+) → H1
 - EW11-A B (-) → H2
@@ -29,6 +31,7 @@ Pi is on ethernet to FritzBox for Home Assistant traffic.
 - Stop Bits: 1
 - Mode: Modbus TCP to RTU gateway (must be "Modbus" mode, not transparent TCP)
 - WiFi: STA mode, connects to Pi AP "leni", gets IP 10.10.100.131 via DHCP reservation
+- Pi AP must use WPA2 (proto: rsn, ccmp) — EW11 will not connect to WPA1/TKIP
 - CLI escape (`+++`): disabled (unnecessary attack surface)
 - Full settings: [Current STA settings](resources/ew11-sta-settings.md) | [AP mode (alternative)](resources/ew11-ap-settings.md)
 
@@ -37,11 +40,17 @@ EW11-A is on the isolated 10.10.100.x network — only reachable via SSH tunnel 
 ```bash
 ssh -L 8080:10.10.100.131:80 -f -N makro@192.168.178.107
 ```
-Then open http://localhost:8080 (login: admin / see ap-settings.md)
+Then open http://localhost:8080 (credentials in `secrets.md`)
 
 #### Factory Reset
 Hold reset button ~5 seconds → restores AP mode with default IP 10.10.100.254, login admin/admin.
 After reset, reconfigure STA mode to connect to "leni" and restore settings per [ew11-sta-settings.md](resources/ew11-sta-settings.md).
+
+#### Pi AP Troubleshooting
+If EW11 cycles connecting/disconnecting every ~4 seconds despite correct password:
+- Check that standalone `hostapd` is not running alongside NetworkManager: `sudo systemctl status hostapd`
+- If running, stop and disable it: `sudo systemctl stop hostapd && sudo systemctl disable hostapd`
+- NM manages the AP via the `leni-ap` connection — a second hostapd instance causes a split-brain conflict that kicks clients every 4 seconds.
 
 ### Home Assistant Configuration
 - **Pi IP**: 192.168.178.107 (user: makro)
@@ -95,7 +104,7 @@ After reset, reconfigure STA mode to connect to "leni" and restore settings per 
 - `configuration.yaml` - HA config: modbus sensors, template sensors, utility meters, switch
 - `heat_pump_dashboard.yaml` - HA dashboard (lovelace, YAML mode)
 - `heat_pump_package_target_control.yaml` - HA package: target temp input, automations, shell command
-- `set_target.py` - Python script to write target temp to heat pump via Modbus
+- `set_target.py` - Python script to write target temp to heat pump via Modbus; clamps the value into the active mode's valid range (reads reg 1) before writing
 - `scan_registers.py` - Modbus register scanner with detailed descriptions
 - `register_dump.txt` - Complete register dump output
 - `upload_dashboard.sh` - Upload dashboard to Pi (no restart needed)
@@ -112,6 +121,16 @@ After reset, reconfigure STA mode to connect to "leni" and restore settings per 
 | 2 | 40003 | Set water temp T1s | Zone1 (low 8 bits), Zone2 (high 8 bits) |
 | 11 | 40012 | T1s Zone 1 | Water temp setpoint (preferred over reg 2) |
 | 16 | 40017 | Power Zone 1 | Zone1 water temp control subsystem only — reg 0 is the real power switch |
+
+### Setpoint Limits (Read Only, mode-dependent)
+| Address | PLC | Description | Zone1 value |
+|---------|-----|-------------|--------|
+| 201 | 40202 | T1s cooling upper limit | 25°C |
+| 202 | 40203 | T1s cooling lower limit | 5°C |
+| 203 | 40204 | T1s heating upper limit | 55°C |
+| 204 | 40205 | T1s heating lower limit | 25°C |
+
+Register 2/11 (T1s) is the *same* setpoint register for both modes — there's no separate "cooling target". Only the valid range differs, enforced above. Writing a value outside the active mode's range is invalid.
 
 ### Sensor Registers (Read Only)
 | Address | PLC | Description | Unit |
@@ -136,12 +155,14 @@ After reset, reconfigure STA mode to connect to "leni" and restore settings per 
 | 151 | 40152 | COP | x0.01 |
 | 199 | 40200 | Operation mode | 0=Off, 2=Cooling, 3=Heating, 5=DHW |
 
+**Known issue**: Register 150 (Power consumption) reads 0 continuously while in Cooling mode on this unit, even with the compressor actively running (confirmed live: mode=2, compressor=41Hz, reg150=0). Works correctly in Heating mode. This is a firmware limitation on the heat pump, not an HA config issue — don't try to "fix" it by substituting another register; ODU current × voltage (HP ODU Power) is the only reliable live power figure while cooling, though it excludes the water pump.
+
 ### Template Sensors & Controls
-- **HP Mode** - Mode select (Auto/Cooling/Heating), reads reg 1, writes via modbus.write_register
+- **HP Mode** - Mode picker (Auto/Cooling/Heating) as a dashboard tile with tap-buttons (`select-options` feature, not a dropdown), reads reg 1, writes via modbus.write_register
 - **HP Mode Text** - Operating mode as text (Off/Cool/Heat/DHW), reads reg 199 (read-only)
 - **HP State Text** - Operating state as text (Idle/Cool/Heat)
 - **HP Current Target** - Zone 1 target extracted from packed register 2
-- **HP Power Consumption** - Power raw / 100 in kW
+- **HP Power Consumption** - Power raw / 100 in kW (see register 150 known issue above — reads 0 in Cooling mode)
 - **HP ODU Power** - ODU current × voltage in W
 - **HP Delta T** - T1 outlet minus Tw_in inlet
 - **HP COP Filtered** - COP capped at 10 (raw register gives unrealistic spikes)
@@ -151,6 +172,19 @@ After reset, reconfigure STA mode to connect to "leni" and restore settings per 
 - **HP Energy Total** - Cumulative kWh from Modbus (template sensor, total_increasing)
 - **HP Energy Daily/Monthly/Yearly** - Utility meters sourced from HP Energy Total
 - Dashboard bars use `statistics-graph` with `stat_types: change` on HP Energy Total
+
+### Target Temperature Control (heat_pump_package_target_control.yaml)
+- `input_number.hp_target_temp` — range 5-55°C (union of both modes' valid ranges, see Setpoint Limits above)
+- **HP Write Target Temp** — pushes input_number changes to the heat pump via `set_target.py`
+- **HP Sync Target Temp** — pulls the real device value back into input_number whenever it changes; also runs on HA start (10s delay) to catch up after a restart
+- **HP Clamp Target Temp for Mode** — when mode changes (or on HA start), clamps the displayed target into the active mode's valid range (Cooling 5-25°C, Heating 25-55°C; Auto defaults to the heating range)
+- `set_target.py` independently re-clamps every write into the live mode's valid range (reads register 1 itself) before writing register 2 — a hardware-safety net that holds even if the HA-side automations are mid-restart or the UI is set out of range
+
+### Known Gotchas
+- **`input_number.set_min_max` does not exist** as a service in this HA version (verified against `/usr/src/homeassistant/homeassistant/components/input_number/__init__.py` — only `set_value`, `increment`, `decrement`, `reload` are registered). Don't use it; min/max for input_number is static config only. This is why the target-temp range is widened statically (5-55) instead of resized per mode.
+- **Automation `platform: state` triggers can miss the very first state change of a templated/Modbus-derived entity right after an HA restart** (component load-order race — confirmed via the `events` table: `automation_triggered` events were missing for the very first transition, every time, across multiple restarts). `platform: homeassistant, event: start` reliably fires for this project's package automations; `platform: event, event_type: homeassistant_started` did not in testing, despite supposedly firing later/more completely. Pair boot-time logic with the `start` trigger (+ a short delay if it depends on a fresh Modbus poll), not a bare state trigger.
+- **Recorder hides several useful attributes** (`min`/`max` on input_number, `last_triggered` on automations) from history by default in this HA version — querying the SQLite DB for these will silently return nothing useful. Verify automation behavior via the `events` table (`event_types` row for `automation_triggered`, id usually ~27) joined to `event_data`, not via `states`/`state_attributes`.
+- **Lovelace dashboard URL paths must contain a hyphen.** The `solakon` dashboard key in `configuration.yaml`'s `lovelace.dashboards` lacked one and crashed the *entire* frontend into recovery mode on restart (unrelated to any heat-pump change — just lurking in the shared file). Fixed by renaming to `solakon-solar`. If a restart ever drops the whole UI into recovery mode, check this first.
 
 ## TODO
 - [x] Determine RS-485 adapter for Raspberry Pi → EW11-A
@@ -164,4 +198,5 @@ After reset, reconfigure STA mode to connect to "leni" and restore settings per 
 - [x] Publish on GitHub
 - [x] Add mode control (auto/heating/cooling) — enabled cooling via reg 210 bit 9, template select on reg 1
 - [x] Harden EW11-A: isolated Pi AP network, disabled CLI escape, restricted web access
+- [x] Clamp target temp to the active mode's valid range (Cooling 5-25°C, Heating 25-55°C), restart-safe
 - [ ] Improve EW11-A WiFi signal (currently marginal)

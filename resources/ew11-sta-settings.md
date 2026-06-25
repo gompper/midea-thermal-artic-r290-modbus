@@ -7,8 +7,8 @@ EW11-A connects as a WiFi client to the Pi's isolated "leni" access point.
 ### Authentication
 | Setting | Value |
 |---------|-------|
-| User Name | admin |
-| Password | (strong password) |
+| User Name | makro |
+| Password | (see `secrets.md`) |
 
 Web UI is only reachable via SSH tunnel through the Pi — not exposed to the home network.
 
@@ -43,6 +43,8 @@ LAN settings are for AP mode only (unused in STA mode). DHCP Server OFF.
 | STA KEY | (AP password) |
 
 Connects to the Pi's isolated AP. Only the Pi is on this network.
+
+**Note:** Pi AP must use WPA2 (proto: rsn, pairwise/group: ccmp) — not WPA1/TKIP. EW11 will not connect to WPA1.
 
 ### Telnet Settings
 | Setting | Value |
