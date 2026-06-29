@@ -10,11 +10,13 @@ Integrate Midea Thermal Arctic R290 10kW heat pump with Home Assistant via Modbu
 
 ### Architecture
 ```
-Heat Pump (RS-485 H1/H2) → EW11-A → WiFi (AP: leni) → Pi wlan0 → Pi eth0 → FritzBox
-                                      10.10.100.131        10.10.100.1    192.168.178.107
+Heat Pump (RS-485 H1/H2) → EW11-A → WiFi (AP: leni) → Pi wlx24ec99bfdf3f → Pi eth0 → FritzBox
+                                      10.10.100.131        10.10.100.1          192.168.178.107
 ```
-Pi runs wlan0 as an isolated AP ("leni", 10.10.100.x), EW11-A connects as STA client.
+Pi runs an isolated AP ("leni", 10.10.100.x) on `wlx24ec99bfdf3f` (USB WiFi dongle with external antenna). EW11-A connects as STA client.
 Pi is on ethernet to FritzBox for Home Assistant traffic.
+
+**Note on AP interface**: Originally on `wlan0` (built-in WiFi). After installing an M.2 HAT + SSD, the HAT's PCB shielded the built-in antenna enough to drop the already-marginal EW11 signal. Moved to the USB dongle (`wlx24ec99bfdf3f`) which has an external antenna and maintains reliable coverage despite lower raw TX power (20 dBm vs 31 dBm). If the USB dongle is removed or replaced, the AP will fail — `wlan0` will not take over automatically.
 
 
 
@@ -52,6 +54,11 @@ If EW11 cycles connecting/disconnecting every ~4 seconds despite correct passwor
 - If running, stop and disable it: `sudo systemctl stop hostapd && sudo systemctl disable hostapd`
 - NM manages the AP via the `leni-ap` connection — a second hostapd instance causes a split-brain conflict that kicks clients every 4 seconds.
 
+If EW11 cannot connect at all (no DHCP lease in `sudo journalctl -u NetworkManager`):
+- Verify the `leni-ap` connection is active on `wlx24ec99bfdf3f`: `nmcli connection show leni-ap | grep DEVICES`
+- If active on `wlan0` instead (e.g. after a re-image or NM reset), move it back: `sudo nmcli connection modify leni-ap connection.interface-name wlx24ec99bfdf3f && sudo nmcli connection down leni-ap && sudo nmcli connection up leni-ap`
+- Check signal from the Pi using the now-free `wlan0`: `sudo iw dev wlan0 scan | grep -A3 leni`
+
 ### Home Assistant Configuration
 - **Pi IP**: 192.168.178.107 (user: makro)
 - **EW11-A IP**: 10.10.100.131 (reserved via DHCP on Pi AP), TCP port 8899
@@ -61,9 +68,9 @@ If EW11 cycles connecting/disconnecting every ~4 seconds despite correct passwor
 - Docker image: `ghcr.io/home-assistant/home-assistant:stable`
 - HA version: 2026.4.4
 - Backup: `/home/makro/ha_backup/ha-backup.sh`, daily 3am, uploads to `pcloud:backup/homeassistant`, 30-day retention
-- Pi eth0 on FritzBox LAN (ethernet), wlan0 as AP "leni" (isolated 10.10.100.x network)
+- Pi eth0 on FritzBox LAN (ethernet), `wlx24ec99bfdf3f` (USB dongle, external antenna) as AP "leni" (isolated 10.10.100.x network)
 - EW11-A DHCP reservation: MAC `74:e9:d8:7f:71:1c` → `10.10.100.131` (in `/etc/NetworkManager/dnsmasq-shared.d/ew11-reservation.conf`)
-- Pi AP config: NetworkManager, `/etc/netplan/60-ethernet.yaml`, connection "leni" via nmcli
+- Pi AP config: NetworkManager connection "leni-ap" bound to `wlx24ec99bfdf3f`; reconfigure with `sudo nmcli connection modify leni-ap connection.interface-name wlx24ec99bfdf3f`
 
 ### System Configuration
 - Zone 1 only (no Zone 2)
@@ -110,6 +117,7 @@ If EW11 cycles connecting/disconnecting every ~4 seconds despite correct passwor
 - `upload_dashboard.sh` - Upload dashboard to Pi (no restart needed)
 - `upload_config.sh` - Upload config to Pi (restart required)
 - `upload_package.sh` - Upload package to Pi (restart required)
+- `deprecated/` - Archived ESP32/ESPHome approach from before the EW11-A was purchased; not active
 
 ## Key Registers
 
@@ -199,4 +207,4 @@ Register 2/11 (T1s) is the *same* setpoint register for both modes — there's n
 - [x] Add mode control (auto/heating/cooling) — enabled cooling via reg 210 bit 9, template select on reg 1
 - [x] Harden EW11-A: isolated Pi AP network, disabled CLI escape, restricted web access
 - [x] Clamp target temp to the active mode's valid range (Cooling 5-25°C, Heating 25-55°C), restart-safe
-- [ ] Improve EW11-A WiFi signal (currently marginal)
+- [x] Improve EW11-A WiFi signal — moved "leni" AP to USB WiFi dongle with external antenna after M.2 HAT shielded built-in wlan0 antenna

@@ -18,7 +18,7 @@ Heat Pump (Wired Controller) → EW11-A → WiFi (AP: leni) → Raspberry Pi →
          H2 (+) → B
 ```
 
-The Pi runs its own isolated WiFi AP ("leni", 10.10.100.x). The EW11-A connects to it as a client — it is not on the home network. The Pi connects to the home router via ethernet.
+The Pi runs its own isolated WiFi AP ("leni", 10.10.100.x) on a dedicated USB WiFi dongle with external antenna. The EW11-A connects to it as a client — it is not on the home network. The Pi connects to the home router via ethernet.
 
 ### EW11-A Configuration
 
@@ -55,6 +55,7 @@ Then open http://localhost:8080.
 | `set_target.py` | Python script to write target temperature (called by HA automation) |
 | `scan_registers.py`* | Modbus register scanner with full documentation |
 | `register_dump.txt`* | Complete register dump with values and descriptions |
+| `deprecated/`* | Archived ESP32/ESPHome prototype from before the EW11-A; not active |
 
 *Utility/reference files - not needed for running.
 
