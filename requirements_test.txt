@@ -1,0 +1,3 @@
+# Test against the Home Assistant release this integration targets. The modbus
+# integration it depends on pins modbus-connection, so neither is listed here.
+pytest-homeassistant-custom-component==0.13.366  # homeassistant==2026.9.3

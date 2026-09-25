@@ -1,7 +1,7 @@
 # Midea Modbus Integration Project
 
 ## Goal
-Integrate Midea Thermal Arctic R290 10kW heat pump with Home Assistant via Modbus RTU.
+Integrate Midea Thermal Arctic R290 10kW heat pump with Home Assistant via Modbus RTU, as a UI-configured custom integration (`custom_components/midea_m_thermal`) on HA 2026.9's shared Modbus connections.
 
 ## Hardware Setup
 - **Heat Pump**: Midea Thermal Arctic R290 10kW
@@ -64,9 +64,10 @@ If EW11 cannot connect at all (no DHCP lease in `sudo journalctl -u NetworkManag
 - **EW11-A IP**: 10.10.100.131 (reserved via DHCP on Pi AP), TCP port 8899
 - **Modbus slave address**: 2 (default on Midea pumps is 1)
 - Config file: `/root/homeassistant/config/configuration.yaml`
+- Integration: `/root/homeassistant/config/custom_components/midea_m_thermal/`, added via Settings → Devices & Services (host 10.10.100.131, port 8899, unit ID 2)
 - Docker container: `home-assistant`
 - Docker image: `ghcr.io/home-assistant/home-assistant:stable`
-- HA version: 2026.4.4
+- HA version: must be 2026.9 or later for the integration (the YAML setup was built on 2026.4.4)
 - Backup: `/home/makro/ha_backup/ha-backup.sh`, daily 3am, uploads to `pcloud:backup/homeassistant`, 30-day retention
 - Pi eth0 on FritzBox LAN (ethernet), `wlx24ec99bfdf3f` (USB dongle, external antenna) as AP "leni" (isolated 10.10.100.x network)
 - EW11-A DHCP reservation: MAC `74:e9:d8:7f:71:1c` → `10.10.100.131` (in `/etc/NetworkManager/dnsmasq-shared.d/ew11-reservation.conf`)
@@ -108,16 +109,28 @@ If EW11 cannot connect at all (no DHCP lease in `sudo journalctl -u NetworkManag
 - `scan_registers.py` - Register scanner with full documentation per register
 
 ## Project Files
-- `configuration.yaml` - HA config: modbus sensors, template sensors, utility meters, switch
-- `heat_pump_dashboard.yaml` - HA dashboard (lovelace, YAML mode)
-- `heat_pump_package_target_control.yaml` - HA package: target temp input, automations, shell command
-- `set_target.py` - Python script to write target temp to heat pump via Modbus; clamps the value into the active mode's valid range (reads reg 1) before writing
-- `scan_registers.py` - Modbus register scanner with detailed descriptions
+- `custom_components/midea_m_thermal/` - The integration: config flow, coordinator, sensor/number/select/switch platforms, diagnostics
+- `custom_components/midea_m_thermal/m_thermal_modbus/` - Device library (register map on `modbus-connection`); must stay free of `homeassistant` imports so it can move to PyPI
+- `tests/` - pytest suite against HA 2026.9.3 + the `modbus-connection` mock, seeded from `tests/fixtures/registers.json` (the real `register_dump.txt` values)
+- `heat_pump_package.yaml` - HA package: utility meters + zone 1 activity template (everything else is native to the integration)
+- `heat_pump_dashboard.yaml` - HA dashboard (lovelace, YAML mode); `tests/test_dashboard.py` fails if it references an entity the setup doesn't create
+- `configuration.yaml` - This project's HA config (includes the package and dashboards; no `modbus:` hub)
+- `scan_registers.py` - Standalone pymodbus register scanner with detailed descriptions
 - `register_dump.txt` - Complete register dump output
+- `upload_integration.sh` - Upload the integration to the Pi (restart required)
 - `upload_dashboard.sh` - Upload dashboard to Pi (no restart needed)
 - `upload_config.sh` - Upload config to Pi (restart required)
 - `upload_package.sh` - Upload package to Pi (restart required)
-- `deprecated/` - Archived ESP32/ESPHome approach from before the EW11-A was purchased; not active
+- `hacs.json` - Lets HACS install the repo as a custom repository
+
+## Integration Architecture (HA 2026.9 Modbus)
+- `async_setup_entry` asks HA's `modbus` integration for a unit with `homeassistant.components.modbus.async_get_unit(hass, entry, ModbusTcpParams(host, port), unit_id)`; the config flow probes with `async_get_temporary_unit`. HA owns and shares the connection (one per endpoint, closed when the last holder unloads) — never open a connection yourself, never reload the entry on a dropped link.
+- `modbus-connection` is **not** in our manifest `requirements`; it comes from `dependencies: ["modbus"]`, pinned by HA (4.10.0 in 2026.9.3). Pinning our own would fight HA's pin.
+- Write against the 4.10.0 API, not the online docs: the docs track `dev`, which has `Device`, `UpdateReport`, `read_optional`, `unit.require_timeout()`. 4.10.0 has none of those, so `m_thermal_modbus/device.py` defines its own `UpdateReport` and poll loop. Check `homeassistant/components/modbus/manifest.json` at the target HA tag before using a newer API.
+- Read plan: `Control` (0-22 range, reads 0-2) and `Readings` (`register_ranges=((100,199),)` → one 100-register read) every 30 s; `SetpointLimits` (201-204) with `max_span=1` because the 200+ block refuses multi-register reads. Limits are read once, retried after timeouts, and fall back to 5-25 / 25-55 if refused.
+- Writes: power is `bit(0, 1)`, target is `bits(2, 0, 8)` — both read-modify-write, preserving the other bits/Zone 2 byte. `async_set_zone1_target` re-reads the mode and clamps; `async_set_mode` pulls an out-of-range setpoint into the new mode's range.
+- Coordinator recycles the link (`unit.disconnect()`) after 3 consecutive timeouts — the EW11 can hold its socket open while RS-485 is dead.
+- Run tests: `uv venv --python 3.14 && uv pip install -r requirements_test.txt && pytest`
 
 ## Key Registers
 
@@ -153,7 +166,7 @@ Register 2/11 (T1s) is the *same* setpoint register for both modes — there's n
 | 110 | 40111 | T1 (total outlet water) | °C |
 | 116 | 40117 | P1 (high pressure) | kPa |
 | 117 | 40118 | P2 (low pressure) | kPa |
-| 118 | 40119 | ODU current | A (x0.1) |
+| 118 | 40119 | ODU current | A (unscaled per the Midea PDF; `register_dump.txt`/`scan_registers.py` wrongly annotate it x0.1) |
 | 119 | 40120 | ODU voltage | V |
 | 124 | 40125 | Current error | Error code |
 | 138 | 40139 | Water flow | m³/h (x0.01) |
@@ -163,33 +176,17 @@ Register 2/11 (T1s) is the *same* setpoint register for both modes — there's n
 | 151 | 40152 | COP | x0.01 |
 | 199 | 40200 | Operation mode | 0=Off, 2=Cooling, 3=Heating, 5=DHW |
 
-**Known issue**: Register 150 (Power consumption) reads 0 continuously while in Cooling mode on this unit, even with the compressor actively running (confirmed live: mode=2, compressor=41Hz, reg150=0). Works correctly in Heating mode. This is a firmware limitation on the heat pump, not an HA config issue — don't try to "fix" it by substituting another register; ODU current × voltage (HP ODU Power) is the only reliable live power figure while cooling, though it excludes the water pump.
+**Known issue**: Register 150 (Power consumption) reads 0 continuously while in Cooling mode on this unit, even with the compressor actively running (confirmed live: mode=2, compressor=41Hz, reg150=0). Works correctly in Heating mode. This is a firmware limitation on the heat pump, not an HA config issue — don't try to "fix" it by substituting another register; ODU current × voltage (`sensor.heat_pump_outdoor_unit_power`) is the only reliable live power figure while cooling, though it excludes the water pump.
 
-### Template Sensors & Controls
-- **HP Mode** - Mode picker (Auto/Cooling/Heating) as a dashboard tile with tap-buttons (`select-options` feature, not a dropdown), reads reg 1, writes via modbus.write_register
-- **HP Mode Text** - Operating mode as text (Off/Cool/Heat/DHW), reads reg 199 (read-only)
-- **HP State Text** - Operating state as text (Idle/Cool/Heat)
-- **HP Current Target** - Zone 1 target extracted from packed register 2
-- **HP Power Consumption** - Power raw / 100 in kW (see register 150 known issue above — reads 0 in Cooling mode)
-- **HP ODU Power** - ODU current × voltage in W
-- **HP Delta T** - T1 outlet minus Tw_in inlet
-- **HP COP Filtered** - COP capped at 10 (raw register gives unrealistic spikes)
-- **HP Energy Total** - 32-bit combined energy (regs 143+144), with availability guard
-
-### Energy Tracking
-- **HP Energy Total** - Cumulative kWh from Modbus (template sensor, total_increasing)
-- **HP Energy Daily/Monthly/Yearly** - Utility meters sourced from HP Energy Total
-- Dashboard bars use `statistics-graph` with `stat_types: change` on HP Energy Total
-
-### Target Temperature Control (heat_pump_package_target_control.yaml)
-- `input_number.hp_target_temp` — range 5-55°C (union of both modes' valid ranges, see Setpoint Limits above)
-- **HP Write Target Temp** — pushes input_number changes to the heat pump via `set_target.py`
-- **HP Sync Target Temp** — pulls the real device value back into input_number whenever it changes; also runs on HA start (10s delay) to catch up after a restart
-- **HP Clamp Target Temp for Mode** — when mode changes (or on HA start), clamps the displayed target into the active mode's valid range (Cooling 5-25°C, Heating 25-55°C; Auto defaults to the heating range)
-- `set_target.py` independently re-clamps every write into the live mode's valid range (reads register 1 itself) before writing register 2 — a hardware-safety net that holds even if the HA-side automations are mid-restart or the UI is set out of range
+### Entities (device name "Heat pump" → `<domain>.heat_pump_<key>`)
+- **Controls**: `switch.heat_pump_power` (reg 0 bit 1), `select.heat_pump_mode` (reg 1: auto/cooling/heating), `number.heat_pump_target_temperature` (reg 2 low byte; min/max follow the live mode from regs 201-204)
+- **Enum sensors**: `operating_state` (reg 101: idle/cooling/heating), `operation_mode` (reg 199: off/cooling/heating/dhw)
+- **Derived in the library**: `cop` (reg 151, None when 0 or >10 — the raw register spikes), `outdoor_unit_power` (current × voltage, the only live power figure in cooling, see reg 150 issue), `water_temperature_delta` (T1 − Tw_in)
+- **`energy_consumption`** (regs 143-144, uint32 ×0.01, raw 0 = no value): `RestoreSensor`, stays available while offline and ignores <1% dips, so LTS/Energy dashboard never see a false reset
+- **Package**: `sensor.heat_pump_zone_1_activity` (template), `sensor.heat_pump_energy_daily/monthly/yearly` (utility meters on `energy_consumption`)
 
 ### Known Gotchas
-- **`input_number.set_min_max` does not exist** as a service in this HA version (verified against `/usr/src/homeassistant/homeassistant/components/input_number/__init__.py` — only `set_value`, `increment`, `decrement`, `reload` are registered). Don't use it; min/max for input_number is static config only. This is why the target-temp range is widened statically (5-55) instead of resized per mode.
+- **`input_number.set_min_max` does not exist** as a service (only `set_value`, `increment`, `decrement`, `reload`), so an `input_number`'s range is static. That is why the target temperature is a native `number` entity whose `native_min_value`/`native_max_value` follow the mode.
 - **Automation `platform: state` triggers can miss the very first state change of a templated/Modbus-derived entity right after an HA restart** (component load-order race — confirmed via the `events` table: `automation_triggered` events were missing for the very first transition, every time, across multiple restarts). `platform: homeassistant, event: start` reliably fires for this project's package automations; `platform: event, event_type: homeassistant_started` did not in testing, despite supposedly firing later/more completely. Pair boot-time logic with the `start` trigger (+ a short delay if it depends on a fresh Modbus poll), not a bare state trigger.
 - **Recorder hides several useful attributes** (`min`/`max` on input_number, `last_triggered` on automations) from history by default in this HA version — querying the SQLite DB for these will silently return nothing useful. Verify automation behavior via the `events` table (`event_types` row for `automation_triggered`, id usually ~27) joined to `event_data`, not via `states`/`state_attributes`.
 - **Lovelace dashboard URL paths must contain a hyphen.** The `solakon` dashboard key in `configuration.yaml`'s `lovelace.dashboards` lacked one and crashed the *entire* frontend into recovery mode on restart (unrelated to any heat-pump change — just lurking in the shared file). Fixed by renaming to `solakon-solar`. If a restart ever drops the whole UI into recovery mode, check this first.
@@ -207,4 +204,5 @@ Register 2/11 (T1s) is the *same* setpoint register for both modes — there's n
 - [x] Add mode control (auto/heating/cooling) — enabled cooling via reg 210 bit 9, template select on reg 1
 - [x] Harden EW11-A: isolated Pi AP network, disabled CLI escape, restricted web access
 - [x] Clamp target temp to the active mode's valid range (Cooling 5-25°C, Heating 25-55°C), restart-safe
+- [x] Rebuild as a UI-configured integration on HA 2026.9 shared Modbus connections (`async_get_unit`), replacing the `modbus:` YAML hub, templates, `input_number` + automations and `set_target.py`
 - [x] Improve EW11-A WiFi signal — moved "leni" AP to USB WiFi dongle with external antenna after M.2 HAT shielded built-in wlan0 antenna

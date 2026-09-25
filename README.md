@@ -2,6 +2,8 @@
 
 Home Assistant integration for Midea M-Thermal Arctic R290 heat pumps via Modbus RTU over TCP.
 
+Built on the shared Modbus connections introduced in Home Assistant 2026.9: the integration is set up in the UI, knows the heat pump's register map itself, and shares its gateway connection with any other Modbus integration on the same bus instead of competing with it. No `modbus:` YAML is needed.
+
 ![Home Assistant Dashboard](resources/home-assistant-dashboard.png)
 
 ## Hardware Setup
@@ -49,10 +51,12 @@ Then open http://localhost:8080.
 
 | File | Description |
 |------|-------------|
-| `configuration.yaml` | Home Assistant config with Modbus sensors, template sensors, utility meters |
-| `heat_pump_dashboard.yaml` | Lovelace dashboard for heat pump monitoring |
-| `heat_pump_package_target_control.yaml` | HA package with input_number, shell_command, automation for target temp |
-| `set_target.py` | Python script to write target temperature (called by HA automation) |
+| `custom_components/midea_m_thermal/` | The integration (requires Home Assistant 2026.9 or later) |
+| `custom_components/midea_m_thermal/m_thermal_modbus/` | Device library: the register map on [modbus-connection](https://home-assistant-libs.github.io/modbus-connection/), no Home Assistant imports |
+| `heat_pump_package.yaml` | Optional HA package: daily/monthly/yearly energy meters and a zone 1 activity sensor |
+| `heat_pump_dashboard.yaml` | Optional Lovelace dashboard for heat pump monitoring |
+| `configuration.yaml` | This project's HA config, which includes the package and dashboard |
+| `tests/` | Tests against Home Assistant 2026.9.3 and a mock heat pump loaded with a real register dump |
 | `scan_registers.py`* | Modbus register scanner with full documentation |
 | `register_dump.txt`* | Complete register dump with values and descriptions |
 | `deprecated/`* | Archived ESP32/ESPHome prototype from before the EW11-A; not active |
@@ -119,21 +123,35 @@ Config directory: `/root/homeassistant/config/`
 
 ## Installation
 
-1. Copy files to your Home Assistant config directory (`/root/homeassistant/config/`)
-2. Update EW11-A IP address in `configuration.yaml` (default in this project: `10.10.100.131`)
-3. Update Modbus slave address if using default (1) instead of 2
-4. Restart Home Assistant
-5. Dashboard appears automatically in sidebar as "Heat Pump"
+Requires Home Assistant 2026.9 or later.
+
+1. Install the integration, either:
+   - **HACS**: add this repository as a custom repository (type *Integration*), then download *Midea M-Thermal*, or
+   - **Manually**: copy `custom_components/midea_m_thermal/` into your config directory's `custom_components/` (`./upload_integration.sh` does this for the Pi in this project).
+2. Restart Home Assistant.
+3. Go to **Settings → Devices & Services → Add Integration → Midea M-Thermal** and enter:
+   - **Host**: the EW11-A's address (this project: `10.10.100.131`)
+   - **Port**: `8899`
+   - **Unit ID**: the Modbus address set on the wired controller (Midea default `1`; this project uses `2`)
+
+   The flow reads the heat pump before it saves anything, so a wrong address or unit ID is reported right away.
+4. Optional: add `heat_pump_package.yaml` as a package and `heat_pump_dashboard.yaml` as a YAML dashboard (see `configuration.yaml`). The dashboard's charts use [apexcharts-card](https://github.com/RomRider/apexcharts-card) from HACS.
+
+The gateway, port or unit ID can be changed later with **Reconfigure** on the integration's entry.
+
+### Migrating from the YAML setup
+
+Earlier versions of this repository configured the heat pump through a `modbus:` hub in `configuration.yaml`. Remove that hub, the `HP …` template sensors and select, and the `shell_command`/automations/`input_number` of the old `heat_pump_package_target_control.yaml` before adding the integration, so only one client polls the gateway. Entity IDs change from `…hp_…` to `…heat_pump_…`; the shipped dashboard and package already use the new ones.
 
 ## Features
 
-- Real-time monitoring: temperatures, pressures, compressor frequency, COP
-- Power on/off control via Modbus (register 0)
-- Mode control: Auto / Heating / Cooling (register 1)
-- Target temperature adjustment with +/- buttons, auto-clamped to the active mode's valid range (Cooling 5-25°C, Heating 25-55°C)
-- Energy tracking (daily/monthly/yearly)
-- Historical graphs for temperatures, power, COP (10-day full resolution)
-- Long-term statistics (>10 days) for outdoor temp, water temps, compressor frequency, pressures, discharge temp, water flow
+- Real-time monitoring: temperatures, pressures, compressor frequency, flow, power, heating capacity, COP
+- Power on/off (register 0, Zone 1 water bit only, so other zones keep their state)
+- Mode: Auto / Cooling / Heating (register 1)
+- Target temperature whose min/max follow the active mode, read from the heat pump's own limits (registers 201-204; Cooling 5-25 °C, Heating 25-55 °C on this unit). Switching to cooling with a heating setpoint above the cooling maximum pulls the setpoint down, and every write is clamped to the live mode as a safety net
+- Lifetime energy counter that holds its value while the heat pump is offline, so long-term statistics and the Energy dashboard stay intact
+- Diagnostics download with the raw register map
+- Two Modbus requests per 30 s poll (registers 0-2 and 100-199), where the YAML setup made one per sensor
 
 ## Register Documentation
 
@@ -160,12 +178,14 @@ Config directory: `/root/homeassistant/config/`
 |     110 | T1 | Total outlet water temperature |
 |     116 | P1 | High-side refrigerant pressure (kPa) |
 |     117 | P2 | Low-side refrigerant pressure (kPa) |
-|     118 | ODU current | Outdoor unit current (x0.1 A) |
+|     118 | ODU current | Outdoor unit current (A) |
 |     119 | ODU voltage | Outdoor unit supply voltage (V) |
+|     123 | Unit capacity | Nominal capacity in kW (e.g. 10) |
 |     124 | Current error | Error code, 0=no error |
 |     138 | Water flow | Flow rate through heat exchanger (x0.01 m³/h) |
 |     143 | Energy consumption high | Cumulative kWh, high 16 bits (x0.01) |
 |     144 | Energy consumption low | Cumulative kWh, low 16 bits (x0.01) |
+|     148 | Heating capacity | Real-time heating capacity (x0.01 kW) |
 |     150 | Heating power | Real-time power consumption (x0.01 kW). On this unit, reads 0 continuously while in Cooling mode even with the compressor running — appears to be a firmware limitation specific to cooling. Works correctly in Heating mode |
 |     151 | Heating COP | Real-time coefficient of performance (x0.01) |
 |     199 | Operation mode | 0=Off, 2=Cool, 3=Heat, 5=DHW |

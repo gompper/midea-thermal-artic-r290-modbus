@@ -1,0 +1,67 @@
+{
+  "entity": {
+    "number": {
+      "target_temperature": {
+        "default": "mdi:thermometer-water"
+      }
+    },
+    "select": {
+      "mode": {
+        "default": "mdi:thermostat-auto",
+        "state": {
+          "auto": "mdi:thermostat-auto",
+          "cooling": "mdi:snowflake",
+          "heating": "mdi:fire"
+        }
+      }
+    },
+    "sensor": {
+      "operating_state": {
+        "default": "mdi:heat-pump-outline",
+        "state": {
+          "idle": "mdi:sleep",
+          "cooling": "mdi:snowflake",
+          "heating": "mdi:fire"
+        }
+      },
+      "operation_mode": {
+        "default": "mdi:heat-pump-outline",
+        "state": {
+          "off": "mdi:power-off",
+          "cooling": "mdi:snowflake",
+          "heating": "mdi:fire",
+          "dhw": "mdi:water-boiler"
+        }
+      },
+      "water_inlet_temperature": {
+        "default": "mdi:thermometer-chevron-down"
+      },
+      "water_outlet_temperature": {
+        "default": "mdi:thermometer-chevron-up"
+      },
+      "water_temperature_delta": {
+        "default": "mdi:thermometer-lines"
+      },
+      "water_flow": {
+        "default": "mdi:water-pump"
+      },
+      "compressor_frequency": {
+        "default": "mdi:sine-wave"
+      },
+      "heating_capacity": {
+        "default": "mdi:heat-wave"
+      },
+      "cop": {
+        "default": "mdi:leaf"
+      },
+      "error_code": {
+        "default": "mdi:alert-circle-outline"
+      }
+    },
+    "switch": {
+      "power": {
+        "default": "mdi:power"
+      }
+    }
+  }
+}

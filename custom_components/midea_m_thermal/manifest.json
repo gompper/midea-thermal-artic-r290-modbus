@@ -1,0 +1,13 @@
+{
+  "domain": "midea_m_thermal",
+  "name": "Midea M-Thermal",
+  "codeowners": ["@mkroiss"],
+  "config_flow": true,
+  "dependencies": ["modbus"],
+  "documentation": "https://github.com/mkroiss/midea-thermal-artic-r290-modbus",
+  "integration_type": "device",
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/mkroiss/midea-thermal-artic-r290-modbus/issues",
+  "requirements": [],
+  "version": "1.0.0"
+}

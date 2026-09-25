@@ -1,0 +1,33 @@
+# Heat pump extras on top of the Midea M-Thermal integration
+# (custom_components/midea_m_thermal), which provides every sensor, the power
+# switch, the mode select and the mode-bounded target temperature.
+
+template:
+  - sensor:
+      - name: "Heat pump zone 1 activity"
+        unique_id: heat_pump_zone_1_activity
+        icon: mdi:radiator
+        state: >
+          {% set state = states('sensor.heat_pump_operating_state') %}
+          {% set running = states('sensor.heat_pump_compressor_frequency') | int(0) > 0 %}
+          {% if state == 'heating' %}{{ '🔥 Active' if running else '♨️ Standby' }}
+          {% elif state == 'cooling' %}{{ '❄️ Active' if running else '❄️ Standby' }}
+          {% else %}⚫ Off
+          {% endif %}
+
+utility_meter:
+  heat_pump_energy_daily:
+    unique_id: heat_pump_energy_daily
+    source: sensor.heat_pump_energy_consumption
+    name: Heat pump energy daily
+    cycle: daily
+  heat_pump_energy_monthly:
+    unique_id: heat_pump_energy_monthly
+    source: sensor.heat_pump_energy_consumption
+    name: Heat pump energy monthly
+    cycle: monthly
+  heat_pump_energy_yearly:
+    unique_id: heat_pump_energy_yearly
+    source: sensor.heat_pump_energy_consumption
+    name: Heat pump energy yearly
+    cycle: yearly

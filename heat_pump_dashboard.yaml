@@ -15,7 +15,7 @@ views:
               chart:
                 height: 150
             series:
-              - entity: sensor.hp_outdoor_temp
+              - entity: sensor.heat_pump_outdoor_temperature
                 name: Outdoor (T4)
                 color: "#FFA500"
                 statistics:
@@ -26,31 +26,31 @@ views:
           - type: horizontal-stack
             cards:
               - type: tile
-                entity: switch.hp_power
+                entity: switch.heat_pump_power
                 name: Power
                 icon: mdi:power
                 tap_action:
                   action: toggle
               - type: tile
-                entity: input_number.hp_target_temp
+                entity: number.heat_pump_target_temperature
                 name: Target
                 features:
                   - type: numeric-input
                     style: buttons
               - type: tile
-                entity: select.hp_mode
+                entity: select.heat_pump_mode
                 name: Mode
                 features:
                   - type: select-options
               - type: entity
-                entity: sensor.hp_state_text
+                entity: sensor.heat_pump_operating_state
                 name: State
               - type: entity
-                entity: sensor.hp_zone_1_active
+                entity: sensor.heat_pump_zone_1_activity
                 name: Zone 1
                 icon: mdi:radiator
               - type: entity
-                entity: sensor.hp_error_code
+                entity: sensor.heat_pump_error_code
                 name: Error
                 icon: mdi:alert-circle-outline
 
@@ -58,23 +58,23 @@ views:
           - type: horizontal-stack
             cards:
               - type: entity
-                entity: sensor.hp_outdoor_temp
+                entity: sensor.heat_pump_outdoor_temperature
                 name: Outdoor
                 icon: mdi:thermometer
               - type: entity
-                entity: sensor.hp_water_inlet_temp
+                entity: sensor.heat_pump_water_inlet_temperature
                 name: Inlet
                 icon: mdi:thermometer-chevron-down
               - type: entity
-                entity: sensor.hp_outlet_water_temp
+                entity: sensor.heat_pump_water_outlet_temperature
                 name: Outlet
                 icon: mdi:thermometer-chevron-up
               - type: entity
-                entity: sensor.hp_delta_t
+                entity: sensor.heat_pump_water_temperature_delta
                 name: Delta T
                 icon: mdi:thermometer-lines
               - type: entity
-                entity: sensor.hp_water_flow
+                entity: sensor.heat_pump_water_flow
                 name: Water Flow
                 icon: mdi:water-pump
 
@@ -83,30 +83,30 @@ views:
             title: Water Temperatures
             hours_to_show: 24
             entities:
-              - entity: sensor.hp_outlet_water_temp
+              - entity: sensor.heat_pump_water_outlet_temperature
                 name: Outlet (T1)
-              - entity: sensor.hp_water_inlet_temp
+              - entity: sensor.heat_pump_water_inlet_temperature
                 name: Inlet (Tw_in)
-              - entity: sensor.hp_outdoor_temp
+              - entity: sensor.heat_pump_outdoor_temperature
                 name: Outdoor (T4)
 
           # === Electrical ===
           - type: horizontal-stack
             cards:
               - type: entity
-                entity: sensor.hp_power_consumption
+                entity: sensor.heat_pump_power_consumption
                 name: Power
                 icon: mdi:lightning-bolt
               - type: entity
-                entity: sensor.hp_odu_current
+                entity: sensor.heat_pump_outdoor_unit_current
                 name: ODU Current
                 icon: mdi:current-ac
               - type: entity
-                entity: sensor.hp_odu_voltage
+                entity: sensor.heat_pump_outdoor_unit_voltage
                 name: ODU Voltage
                 icon: mdi:flash
               - type: entity
-                entity: sensor.hp_odu_power
+                entity: sensor.heat_pump_outdoor_unit_power
                 name: ODU Power
                 icon: mdi:lightning-bolt
 
@@ -115,24 +115,24 @@ views:
             cards:
               - type: entities
                 entities:
-                  - entity: sensor.hp_cop_filtered
+                  - entity: sensor.heat_pump_cop
                     name: COP
                     icon: mdi:leaf
                 header:
                   type: graph
-                  entity: sensor.hp_cop_filtered
+                  entity: sensor.heat_pump_cop
                   detail: 2
               - type: entities
                 entities:
-                  - entity: sensor.hp_compressor_frequency
+                  - entity: sensor.heat_pump_compressor_frequency
                     name: Compressor
                     icon: mdi:sine-wave
                 header:
                   type: graph
-                  entity: sensor.hp_compressor_frequency
+                  entity: sensor.heat_pump_compressor_frequency
                   detail: 2
               - type: gauge
-                entity: sensor.hp_high_pressure
+                entity: sensor.heat_pump_high_pressure
                 name: High Pressure
                 min: 0
                 max: 4000
@@ -142,7 +142,7 @@ views:
                   yellow: 2500
                   red: 3500
               - type: gauge
-                entity: sensor.hp_low_pressure
+                entity: sensor.heat_pump_low_pressure
                 name: Low Pressure
                 min: 0
                 max: 1500
@@ -158,8 +158,8 @@ views:
               - type: statistics-graph
                 title: Power
                 entities:
-                  - entity: sensor.hp_power_consumption
-                  - entity: sensor.hp_odu_power
+                  - entity: sensor.heat_pump_power_consumption
+                  - entity: sensor.heat_pump_outdoor_unit_power
                 stat_types:
                   - mean
                 period: 5minute
@@ -168,11 +168,11 @@ views:
                 title: Refrigerant Circuit
                 hours_to_show: 24
                 entities:
-                  - entity: sensor.hp_condenser_temp
+                  - entity: sensor.heat_pump_condenser_temperature
                     name: Condenser (T3)
-                  - entity: sensor.hp_discharge_temp
+                  - entity: sensor.heat_pump_discharge_temperature
                     name: Discharge (Tp)
-                  - entity: sensor.hp_suction_temp
+                  - entity: sensor.heat_pump_suction_temperature
                     name: Suction (Th)
 
           # === COP History ===
@@ -180,26 +180,26 @@ views:
             title: COP
             hours_to_show: 24
             entities:
-              - entity: sensor.hp_cop_filtered
+              - entity: sensor.heat_pump_cop
                 name: COP
 
           # === Energy Summary ===
           - type: horizontal-stack
             cards:
               - type: entity
-                entity: sensor.hp_energy_daily
+                entity: sensor.heat_pump_energy_daily
                 name: Today
                 icon: mdi:counter
               - type: entity
-                entity: sensor.hp_energy_monthly
+                entity: sensor.heat_pump_energy_monthly
                 name: Month
                 icon: mdi:calendar-month
               - type: entity
-                entity: sensor.hp_energy_yearly
+                entity: sensor.heat_pump_energy_yearly
                 name: Year
                 icon: mdi:calendar
               - type: entity
-                entity: sensor.hp_energy_total
+                entity: sensor.heat_pump_energy_consumption
                 name: Total
                 icon: mdi:sigma
 
@@ -207,7 +207,7 @@ views:
           - type: statistics-graph
             title: Daily Energy (kWh)
             entities:
-              - entity: sensor.hp_energy_total
+              - entity: sensor.heat_pump_energy_consumption
             chart_type: bar
             stat_types:
               - change
@@ -218,7 +218,7 @@ views:
           - type: statistics-graph
             title: Monthly Energy (kWh)
             entities:
-              - entity: sensor.hp_energy_total
+              - entity: sensor.heat_pump_energy_consumption
             chart_type: bar
             stat_types:
               - change
@@ -229,7 +229,7 @@ views:
           - type: statistics-graph
             title: Yearly Energy (kWh)
             entities:
-              - entity: sensor.hp_energy_total
+              - entity: sensor.heat_pump_energy_consumption
             chart_type: bar
             stat_types:
               - change

@@ -1,0 +1,150 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "description": "Connect to the heat pump's wired controller through a Modbus TCP gateway, such as an Elfin EW11 in Modbus mode.",
+        "data": {
+          "host": "Host",
+          "port": "Port",
+          "unit_id": "Unit ID"
+        },
+        "data_description": {
+          "host": "Hostname or IP address of the Modbus TCP gateway.",
+          "port": "Modbus TCP port of the gateway. The Elfin EW11 uses 8899.",
+          "unit_id": "Modbus address of the heat pump, set on the wired controller. Midea ships it as 1."
+        }
+      },
+      "reconfigure": {
+        "description": "Change how Home Assistant reaches the heat pump.",
+        "data": {
+          "host": "Host",
+          "port": "Port",
+          "unit_id": "Unit ID"
+        },
+        "data_description": {
+          "host": "Hostname or IP address of the Modbus TCP gateway.",
+          "port": "Modbus TCP port of the gateway. The Elfin EW11 uses 8899.",
+          "unit_id": "Modbus address of the heat pump, set on the wired controller. Midea ships it as 1."
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect. Check the gateway address, that it runs in Modbus TCP mode, and the unit ID.",
+      "not_a_heat_pump": "A device answered, but not like a Midea M-Thermal heat pump. Check the unit ID.",
+      "unknown": "Unexpected error"
+    },
+    "abort": {
+      "already_configured": "This heat pump is already configured",
+      "reconfigure_successful": "Re-configuration was successful"
+    }
+  },
+  "entity": {
+    "number": {
+      "target_temperature": {
+        "name": "Target temperature"
+      }
+    },
+    "select": {
+      "mode": {
+        "name": "Mode",
+        "state": {
+          "auto": "Auto",
+          "cooling": "Cooling",
+          "heating": "Heating"
+        }
+      }
+    },
+    "sensor": {
+      "operating_state": {
+        "name": "Operating state",
+        "state": {
+          "idle": "Idle",
+          "cooling": "Cooling",
+          "heating": "Heating"
+        }
+      },
+      "operation_mode": {
+        "name": "Operation mode",
+        "state": {
+          "off": "Off",
+          "cooling": "Cooling",
+          "heating": "Heating",
+          "dhw": "Domestic hot water"
+        }
+      },
+      "outdoor_temperature": {
+        "name": "Outdoor temperature"
+      },
+      "water_inlet_temperature": {
+        "name": "Water inlet temperature"
+      },
+      "water_outlet_temperature": {
+        "name": "Water outlet temperature"
+      },
+      "heat_exchanger_outlet_temperature": {
+        "name": "Heat exchanger outlet temperature"
+      },
+      "condenser_temperature": {
+        "name": "Condenser temperature"
+      },
+      "discharge_temperature": {
+        "name": "Discharge temperature"
+      },
+      "suction_temperature": {
+        "name": "Suction temperature"
+      },
+      "water_temperature_delta": {
+        "name": "Water temperature delta"
+      },
+      "water_flow": {
+        "name": "Water flow"
+      },
+      "compressor_frequency": {
+        "name": "Compressor frequency"
+      },
+      "high_pressure": {
+        "name": "High pressure"
+      },
+      "low_pressure": {
+        "name": "Low pressure"
+      },
+      "power_consumption": {
+        "name": "Power consumption"
+      },
+      "heating_capacity": {
+        "name": "Heating capacity"
+      },
+      "cop": {
+        "name": "COP"
+      },
+      "outdoor_unit_current": {
+        "name": "Outdoor unit current"
+      },
+      "outdoor_unit_voltage": {
+        "name": "Outdoor unit voltage"
+      },
+      "outdoor_unit_power": {
+        "name": "Outdoor unit power"
+      },
+      "energy_consumption": {
+        "name": "Energy consumption"
+      },
+      "error_code": {
+        "name": "Error code"
+      }
+    },
+    "switch": {
+      "power": {
+        "name": "Power"
+      }
+    }
+  },
+  "exceptions": {
+    "communication_error": {
+      "message": "Error communicating with the heat pump: {error}"
+    },
+    "write_failed": {
+      "message": "The heat pump did not accept the change: {error}"
+    }
+  }
+}
