@@ -16,9 +16,11 @@ Built on the shared Modbus connections introduced in Home Assistant 2026.9: the 
 
 ```
 Heat Pump (Wired Controller) → EW11-A → WiFi (AP: leni) → Raspberry Pi → Home Assistant
-         H1 (-) → A                      10.10.100.131       10.10.100.1      Modbus TCP
-         H2 (+) → B
+         H1 → A (+)                      10.10.100.131       10.10.100.1      Modbus TCP
+         H2 → B (-)
 ```
+
+Polarity per the wired controller's installation manual (H1 = A+, H2 = B−); the older Modbus protocol PDF shows it the other way round. With the lines swapped the heat pump simply never answers; nothing is damaged.
 
 The Pi runs its own isolated WiFi AP ("leni", 10.10.100.x) on a dedicated USB WiFi dongle with external antenna. The EW11-A connects to it as a client — it is not on the home network. The Pi connects to the home router via ethernet.
 

@@ -20,9 +20,11 @@ Pi is on ethernet to FritzBox for Home Assistant traffic.
 
 
 
-### EW11-A to Wired Controller Wiring
-- EW11-A A (+) → H1
-- EW11-A B (-) → H2
+### Gateway to Wired Controller Wiring
+- Gateway A (+) → H1
+- Gateway B (-) → H2
+- Gateway E/shield → E_H (HA/HB is the link to the hydraulic module, not Modbus)
+- Source: wired controller manual MD23IU-047I, chapter 7.3 (H1 = A+, H2 = B−). The older `resources/midea-modbus-protocol.pdf` says "H1 '-', H2 '+'", which is wrong for this controller generation (HMI software V1.0.0.x). Swapped lines don't damage anything; the heat pump just never answers (adapter status: received bytes = 0)
 - No ground connection needed (short cable)
 - Connected to wired controller, NOT outdoor unit
 
